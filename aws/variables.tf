@@ -29,15 +29,22 @@ variable "github_oidc_provider_arn" {
 }
 variable "api_domain" {
   type        = string
-  description = "Future DNS name, e.g. api.example.com."
+  default     = ""
+  description = "Optional future Cloudflare DNS name, e.g. api.example.com."
 }
-variable "route53_zone_id" {
+variable "origin_certificate_arn" {
   type        = string
-  description = "ID of the future public Route53 zone for DNS and ACM validation."
+  default     = ""
+  description = "ACM certificate ARN in sa-east-1 for the future API domain (public or imported Cloudflare Origin CA). Empty keeps only health endpoints public over HTTP."
+  validation {
+    condition     = var.origin_certificate_arn == "" || (var.api_domain != "" && startswith(var.origin_certificate_arn, "arn:aws:acm:"))
+    error_message = "HTTPS requires api_domain and an ACM certificate ARN."
+  }
 }
 variable "site_url" {
   type        = string
-  description = "HTTPS URL of the frontend site."
+  default     = "https://example.invalid"
+  description = "Future HTTPS frontend site. Reserved placeholder until configured."
   validation {
     condition     = startswith(var.site_url, "https://")
     error_message = "Production SITE_URL must use HTTPS."
@@ -45,16 +52,12 @@ variable "site_url" {
 }
 variable "cors_origins" {
   type        = string
-  description = "Comma-separated exact HTTPS frontend origins."
+  default     = "https://example.invalid"
+  description = "Exact HTTPS frontend origins; reserved placeholder permits no real frontend by default."
 }
 variable "vpc_cidr" {
   type    = string
   default = "10.42.0.0/16"
-}
-variable "private_compute" {
-  type        = bool
-  default     = false
-  description = "false: public-IP hosts, bridge tasks, no inbound Internet access. true: private hosts and one NAT Gateway (extra fixed cost, single-AZ egress)."
 }
 variable "deploy_enabled" {
   type        = bool
@@ -71,7 +74,7 @@ variable "min_tasks" {
 }
 variable "max_tasks" {
   type    = number
-  default = 4
+  default = 1
   validation {
     condition     = var.max_tasks >= var.min_tasks && var.max_tasks <= 4
     error_message = "max_tasks must be >= min_tasks and <=4; resize RDS/pools before increasing."

@@ -1,4 +1,5 @@
 mock_provider "aws" {
+  mock_resource "aws_lb_listener" { defaults = { arn = "arn:aws:elasticloadbalancing:sa-east-1:123456789012:listener/app/test/0123456789abcdef/0123456789abcdef" } }
   mock_resource "aws_launch_template" { defaults = { id = "lt-0123456789abcdef0" } }
   mock_resource "aws_acm_certificate" { defaults = { arn = "arn:aws:acm:sa-east-1:123456789012:certificate/test", domain_validation_options = [{ domain_name = "api.example.com", resource_record_name = "_test.api.example.com", resource_record_type = "CNAME", resource_record_value = "_test.acm-validations.aws" }] } }
   mock_resource "aws_acm_certificate_validation" { defaults = { certificate_arn = "arn:aws:acm:sa-east-1:123456789012:certificate/test" } }
@@ -21,8 +22,7 @@ mock_provider "aws" {
 }
 variables {
   github_repository         = "JeanRoque0/broto-api-golang"
-  api_domain                = "api.example.com"
-  route53_zone_id           = "Z0123456789"
+  api_domain                = ""
   site_url                  = "https://example.com"
   cors_origins              = "https://example.com"
   smtp_from                 = "Broto <sender@example.com>"
@@ -35,8 +35,12 @@ run "cost_oriented_bootstrap" {
     error_message = "Requested compute sizing changed."
   }
   assert {
-    condition     = aws_ecs_service.api.desired_count == 0 && length(aws_nat_gateway.main) == 0
-    error_message = "Bootstrap must not pull an unpublished image or create a NAT by default."
+    condition     = aws_ecs_service.api.desired_count == 0 && length(aws_lb_listener.https) == 0
+    error_message = "Bootstrap must not pull an unpublished image or require HTTPS certificate."
+  }
+  assert {
+    condition     = aws_lb_listener.http.default_action[0].type == "fixed-response" && aws_lb_listener.http.default_action[0].fixed_response[0].status_code == "503" && length(aws_lb_listener_rule.bootstrap_health) == 1
+    error_message = "Without TLS, only health endpoints may be exposed."
   }
   assert {
     condition     = aws_db_instance.main.instance_class == "db.t4g.micro" && aws_db_instance.main.storage_encrypted && !aws_db_instance.main.publicly_accessible && aws_db_instance.main.deletion_protection
@@ -51,16 +55,18 @@ run "cost_oriented_bootstrap" {
     error_message = "Host/container hardening regressed."
   }
 }
-run "private_compute_with_scaling" {
+run "https_with_scaling" {
   command = apply
   variables {
-    private_compute = true
-    deploy_enabled  = true
-    min_tasks       = 2
-    rds_multi_az    = true
+    api_domain             = "api.example.com"
+    origin_certificate_arn = "arn:aws:acm:sa-east-1:123456789012:certificate/test"
+    max_tasks              = 2
+    deploy_enabled         = true
+    min_tasks              = 2
+    rds_multi_az           = true
   }
   assert {
-    condition     = length(aws_nat_gateway.main) == 1 && !aws_launch_template.ecs.network_interfaces[0].associate_public_ip_address && aws_appautoscaling_target.api[0].min_capacity == 2 && aws_db_instance.main.multi_az
-    error_message = "Private/HA variant did not enable the requested topology."
+    condition     = length(aws_lb_listener.https) == 1 && aws_launch_template.ecs.network_interfaces[0].associate_public_ip_address && aws_appautoscaling_target.api[0].min_capacity == 2 && aws_db_instance.main.multi_az
+    error_message = "HTTPS/HA variant did not enable the requested topology."
   }
 }

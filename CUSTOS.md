@@ -22,19 +22,19 @@ Planeje aproximadamente **US$ 110–120/mês** para esse cenário pequeno, antes
 
 “Outros” é uma reserva, não uma tarifa única: três secrets custam US$1,20/mês (US$0,40 cada), ingestão de 1 GB de logs em São Paulo custa US$0,90; somam-se retenção, alarmes, Route53, armazenamento ECR/estado e operações S3/Secrets. Se o volume passar dessas hipóteses, recalcule. O TTL e os acessos afetam requests ao S3; uma request na CDN não implica necessariamente GET no S3.
 
-## Opção com EC2 privada e IP de saída fixo
+## Simplificação aplicada
 
-`private_compute=true` adiciona **1 NAT Gateway**: 730 × US$0,093 = **US$67,89/mês**, mais **US$0,093/GB processado**. O Elastic IP do NAT substitui, neste cenário de um host, o IPv4 público da EC2; a linha base continua com três IPv4 (dois ALB, um NAT).
+NAT Gateway foi removido do código, assim como Route53, sub-redes de compute sem uso e escala por volume de requests. Não há cobrança de NAT; evita-se o acréscimo opcional de US$67,89/mês + US$0,093/GB apresentado na versão anterior do relatório. O NAT já era opcional/desativado na configuração econômica, portanto essa remoção não reduz novamente o subtotal sem NAT.
 
-Com 10 GB processados no NAT, acrescente US$68,82: **US$178,10–180,10/mês** no cenário acima; reserve aproximadamente **US$180–190**, fora tráfego entre AZs/excedentes. S3 usa gateway endpoint e não passa pelo NAT. Downloads de imagens ECR, Secrets Manager, logs, Anthropic e SMTP podem passar. O NAT é de uma AZ; hosts em outra AZ podem gerar transferência inter-AZ.
+Cloudflare fará o DNS, eliminando a zona Route53 da reserva de outros serviços. Reduzimos retenção de logs para 7 dias, ECR para 10 releases e a capacidade normal para 1 task. ALB, EC2 e RDS continuam sendo os principais custos fixos. O orçamento conservador permanece **US$110–120/mês**, no cenário de 100 GB/100 mil requests CDN e sem franquias. Sem tráfego CDN fica aproximadamente **US$98–100/mês**; custos pequenos reais podem ficar abaixo da reserva.
 
-Essa opção resolve saída estável para allowlist SMTP. Sem NAT, substituições/autoscaling mudam IPs dos hosts; não assuma funcionamento de uma allowlist fixa do Brevo nesse modo.
+Sem domínio, criar a infraestrutura já gera essas cobranças, mesmo com login ainda indisponível. CloudFront fotos tem HTTPS próprio; API aguarda certificado no ALB/domínio Cloudflare. Para reduzir muito além disso seria necessário mudar a arquitetura pedida (principalmente ALB), não remover backups/criptografia.
 
 ## Variações e cobranças não incluídas
 
 - CloudFront está em **pay-as-you-go**, não plano flat-rate. Verifique franquias/descontos aplicáveis à conta: eles podem reduzir a linha CDN; o cálculo conservador acima não os desconta. A tarifa usada é South America, primeiro nível de volume, e muda conforme a localização de quem acessa.
 - A LCU é o maior consumo entre conexões, conexões ativas, bytes e avaliações de regras, não uma reserva de 0,1. Se a média for 1 LCU, a linha passa de US$0,80 para **US$8,03** (+US$7,23).
-- EC2 extras durante migration, rolling deploy, recuperação e autoscaling: cada host custa aproximadamente **US$0,04485/h** somando EC2, EBS30GB proporcional e IPv4 no modo público. No privado, retire US$0,005/h de IPv4 por host e considere NAT/tráfego. Capacidade inicial do ECS também pode subir temporariamente acima de um host.
+- EC2 extras durante migration, rolling deploy, recuperação e autoscaling: cada host custa aproximadamente **US$0,04485/h** somando EC2, EBS30GB proporcional e IPv4 no modo público. Capacidade inicial do ECS também pode subir temporariamente acima de um host.
 - Saída de dados da **API/ALB**, tráfego entre AZs, versões anteriores de fotos, downloads não cacheados, requests S3, snapshots/backups excedentes, logs PostgreSQL e crescimento ECR/banco. Storage RDS pode crescer até 50 GB: **US$10,95/mês** só de disco nesse limite, em vez de US$4,38.
 - Créditos CPU excedentes do RDS burstable, se a carga superar a capacidade baseline; EC2 usa Standard e pode ser limitada por falta de créditos. Não confundir vCPU alocada com desempenho sustentado.
 - Registro anual do domínio, cobrança da Anthropic, plano Brevo, GitHub Actions, impostos e conversão para reais. IA pode superar o custo de infraestrutura; depende de tokens/modelo/usuários.
@@ -59,4 +59,4 @@ aws pricing get-products --region us-east-1 --service-code AmazonEC2 \
 - [AWS Price List API](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/price-changes.html), serviços consultados: AmazonEC2, AmazonRDS, AmazonS3, AmazonCloudWatch e AWSSecretsManager.
 - [IPv4 e NAT](https://aws.amazon.com/vpc/pricing/), [RDS PostgreSQL](https://aws.amazon.com/rds/postgresql/pricing/), [CloudFront e planos/franquias](https://aws.amazon.com/cloudfront/pricing/).
 
-Reconsulte tarifas e estime tráfego real antes do apply. Nenhum recurso cobrado foi criado para obter estes valores.
+Reconsulte tarifas e estime tráfego real antes do apply. As consultas de preço são gratuitas; o apply autorizado posteriormente cria os recursos cobrados descritos acima.

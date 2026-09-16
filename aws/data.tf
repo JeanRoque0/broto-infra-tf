@@ -8,7 +8,7 @@ resource "aws_ecr_repository" "api" {
 resource "aws_ecr_lifecycle_policy" "api" {
   repository = aws_ecr_repository.api.name
   policy = jsonencode({ rules = [
-    { rulePriority = 1, description = "Keep 30 recent release images", selection = { tagStatus = "tagged", tagPrefixList = ["git-"], countType = "imageCountMoreThan", countNumber = 30 }, action = { type = "expire" } },
+    { rulePriority = 1, description = "Keep 10 recent release images", selection = { tagStatus = "tagged", tagPrefixList = ["git-"], countType = "imageCountMoreThan", countNumber = 10 }, action = { type = "expire" } },
     { rulePriority = 2, description = "Remove old untagged images", selection = { tagStatus = "untagged", countType = "sinceImagePushed", countUnit = "days", countNumber = 14 }, action = { type = "expire" } }
   ] })
 }
@@ -115,9 +115,9 @@ resource "aws_secretsmanager_secret" "app_database" {
 }
 resource "aws_cloudwatch_log_group" "api" {
   name              = "/ecs/${var.name}"
-  retention_in_days = 14
+  retention_in_days = 7
 }
 resource "aws_cloudwatch_log_group" "postgresql" {
   name              = "/aws/rds/instance/${var.name}/postgresql"
-  retention_in_days = 14
+  retention_in_days = 7
 }

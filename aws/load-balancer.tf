@@ -1,20 +1,3 @@
-resource "aws_acm_certificate" "api" {
-  domain_name       = var.api_domain
-  validation_method = "DNS"
-  lifecycle { create_before_destroy = true }
-}
-resource "aws_route53_record" "certificate" {
-  for_each = toset([var.api_domain])
-  zone_id  = var.route53_zone_id
-  name     = one(aws_acm_certificate.api.domain_validation_options).resource_record_name
-  type     = one(aws_acm_certificate.api.domain_validation_options).resource_record_type
-  records  = [one(aws_acm_certificate.api.domain_validation_options).resource_record_value]
-  ttl      = 60
-}
-resource "aws_acm_certificate_validation" "api" {
-  certificate_arn         = aws_acm_certificate.api.arn
-  validation_record_fqdns = [for record in aws_route53_record.certificate : record.fqdn]
-}
 resource "aws_lb" "api" {
   name                       = var.name
   internal                   = false
@@ -43,54 +26,60 @@ resource "aws_lb_target_group" "api" {
     unhealthy_threshold = 3
   }
 }
+locals {
+  public_url = var.api_domain != "" ? "https://${var.api_domain}" : "http://${aws_lb.api.dns_name}"
+}
 resource "aws_lb_listener" "https" {
+  count             = var.origin_certificate_arn != "" ? 1 : 0
   load_balancer_arn = aws_lb.api.arn
   port              = 443
   protocol          = "HTTPS"
-  certificate_arn   = aws_acm_certificate_validation.api.certificate_arn
+  certificate_arn   = var.origin_certificate_arn
   ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.api.arn
   }
 }
-resource "aws_lb_listener" "redirect" {
+resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.api.arn
   port              = 80
   protocol          = "HTTP"
-  default_action {
-    type = "redirect"
-    redirect {
-      port        = "443"
-      protocol    = "HTTPS"
-      status_code = "HTTP_301"
+  dynamic "default_action" {
+    for_each = var.origin_certificate_arn != "" ? [1] : []
+    content {
+      type = "redirect"
+      redirect {
+        port        = "443"
+        protocol    = "HTTPS"
+        status_code = "HTTP_301"
+      }
+    }
+  }
+  dynamic "default_action" {
+    for_each = var.origin_certificate_arn == "" ? [1] : []
+    content {
+      type = "fixed-response"
+      fixed_response {
+        content_type = "application/json"
+        status_code  = "503"
+        message_body = "{\"error\":\"https_configuration_pending\"}"
+      }
     }
   }
 }
-resource "aws_route53_record" "api" {
-  zone_id = var.route53_zone_id
-  name    = var.api_domain
-  type    = "A"
-  alias {
-    name                   = aws_lb.api.dns_name
-    zone_id                = aws_lb.api.zone_id
-    evaluate_target_health = true
+resource "aws_lb_listener_rule" "bootstrap_health" {
+  count        = var.origin_certificate_arn == "" ? 1 : 0
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 1
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.api.arn
   }
-}
-resource "aws_appautoscaling_policy" "requests" {
-  count              = var.deploy_enabled ? 1 : 0
-  name               = "${var.name}-requests"
-  policy_type        = "TargetTrackingScaling"
-  resource_id        = aws_appautoscaling_target.api[0].resource_id
-  scalable_dimension = aws_appautoscaling_target.api[0].scalable_dimension
-  service_namespace  = aws_appautoscaling_target.api[0].service_namespace
-  target_tracking_scaling_policy_configuration {
-    target_value       = 30
-    scale_in_cooldown  = 300
-    scale_out_cooldown = 60
-    predefined_metric_specification {
-      predefined_metric_type = "ALBRequestCountPerTarget"
-      resource_label         = "${aws_lb.api.arn_suffix}/${aws_lb_target_group.api.arn_suffix}"
-    }
+  condition {
+    path_pattern { values = ["/livez", "/readyz", "/healthz"] }
+  }
+  condition {
+    http_request_method { values = ["GET", "HEAD"] }
   }
 }

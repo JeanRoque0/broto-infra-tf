@@ -20,7 +20,7 @@ resource "aws_launch_template" "ecs" {
   credit_specification { cpu_credits = "standard" }
   monitoring { enabled = false }
   network_interfaces {
-    associate_public_ip_address = !var.private_compute
+    associate_public_ip_address = true
     security_groups             = [aws_security_group.hosts.id]
     delete_on_termination       = true
   }
@@ -44,7 +44,7 @@ resource "aws_autoscaling_group" "ecs" {
   min_size                  = 1
   max_size                  = var.max_tasks + 1
   desired_capacity          = 1
-  vpc_zone_identifier       = var.private_compute ? aws_subnet.compute[*].id : aws_subnet.public[*].id
+  vpc_zone_identifier       = aws_subnet.public[*].id
   protect_from_scale_in     = true
   health_check_type         = "EC2"
   health_check_grace_period = 300
@@ -59,7 +59,7 @@ resource "aws_autoscaling_group" "ecs" {
     propagate_at_launch = true
   }
   lifecycle { ignore_changes = [desired_capacity] }
-  depends_on = [aws_route.internet, aws_route.nat, aws_iam_role_policy_attachment.host_ecs, aws_iam_role_policy_attachment.host_ssm]
+  depends_on = [aws_route.internet, aws_iam_role_policy_attachment.host_ecs, aws_iam_role_policy_attachment.host_ssm]
 }
 resource "aws_ecs_capacity_provider" "ec2" {
   name = "${var.name}-ec2"
@@ -93,14 +93,14 @@ locals {
   }
   application_environment = merge(local.common_environment, {
     DB_USER             = "broto_app", DB_MAX_CONNS = tostring(local.db_pool), AUTO_MIGRATE = "false", MAX_CONCURRENT_REQUESTS = "16",
-    PUBLIC_URL          = "https://${var.api_domain}", SITE_URL = var.site_url, CORS_ORIGINS = var.cors_origins,
+    PUBLIC_URL          = local.public_url, SITE_URL = var.site_url, CORS_ORIGINS = var.cors_origins,
     CLOUDFRONT_URL      = "https://${aws_cloudfront_distribution.photos.domain_name}", CLOUDFRONT_KEY_ID = aws_cloudfront_public_key.photos.id,
     STORAGE_BUCKET      = aws_s3_bucket.photos.id, STORAGE_QUOTA_BYTES = "5368709120",
     TRUSTED_PROXY_CIDRS = join(",", aws_subnet.public[*].cidr_block),
     DEV_AUTO_CONFIRM    = "false", SMTP_HOST = var.smtp_host, SMTP_PORT = "587", SMTP_FROM = var.smtp_from, SMTP_MIN_INTERVAL_SECONDS = "60",
     ANTHROPIC_MODEL     = var.anthropic_model, CHAT_MODEL = var.chat_model, ANTHROPIC_EFFORT = var.anthropic_effort, CHAT_MAX_TOKENS = "2048",
     GOOGLE_AUTH_ENABLED = tostring(var.google_enabled), GOOGLE_CLIENT_ID = var.google_client_id,
-    GOOGLE_REDIRECT_URL = "https://${var.api_domain}/v1/auth/google/callback", GOOGLE_RETURN_URLS = var.google_return_urls
+    GOOGLE_REDIRECT_URL = "${local.public_url}/v1/auth/google/callback", GOOGLE_RETURN_URLS = var.google_return_urls
   })
   log_configuration = { logDriver = "awslogs", options = { awslogs-group = aws_cloudwatch_log_group.api.name, awslogs-region = var.aws_region, awslogs-stream-prefix = "ecs", mode = "non-blocking", max-buffer-size = "4m" } }
 }
@@ -178,7 +178,7 @@ resource "aws_ecs_service" "api" {
     container_port   = 8080
   }
   lifecycle { ignore_changes = [task_definition, desired_count] }
-  depends_on = [aws_lb_listener.https, aws_ecs_cluster_capacity_providers.main, aws_iam_role_policy.execution]
+  depends_on = [aws_lb_listener.http, aws_lb_listener.https, aws_ecs_cluster_capacity_providers.main, aws_iam_role_policy.execution]
 }
 resource "aws_appautoscaling_target" "api" {
   count              = var.deploy_enabled ? 1 : 0

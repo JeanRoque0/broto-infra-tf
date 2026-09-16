@@ -93,4 +93,3 @@ resource "aws_cloudfront_response_headers_policy" "photos" {
 }
 output "photos_cdn_url" { value = "https://${aws_cloudfront_distribution.photos.domain_name}" }
 output "photos_cdn_key_id" { value = aws_cloudfront_public_key.photos.id }
-output "smtp_egress_ip" { value = var.private_compute ? aws_eip.nat[0].public_ip : "Dynamic EC2 IPs: SMTP IP allowlists require private_compute=true (NAT EIP)." }
