@@ -35,8 +35,8 @@ run "cost_oriented_bootstrap" {
     error_message = "Requested compute sizing changed."
   }
   assert {
-    condition     = aws_ecs_service.api.desired_count == 0 && length(aws_lb_listener.https) == 0
-    error_message = "Bootstrap must not pull an unpublished image or require HTTPS certificate."
+    condition     = aws_ecs_service.api.desired_count == 0 && aws_autoscaling_group.ecs.min_size == 0 && aws_autoscaling_group.ecs.desired_capacity == 0 && length(aws_lb_listener.https) == 0
+    error_message = "Bootstrap must wait for capacity-provider association before launching hosts or pulling images."
   }
   assert {
     condition     = aws_lb_listener.http.default_action[0].type == "fixed-response" && aws_lb_listener.http.default_action[0].fixed_response[0].status_code == "503" && length(aws_lb_listener_rule.bootstrap_health) == 1

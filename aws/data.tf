@@ -59,8 +59,9 @@ resource "aws_db_parameter_group" "main" {
   name_prefix = "${var.name}-"
   family      = "postgres17"
   parameter {
-    name  = "rds.force_ssl"
-    value = "1"
+    name         = "rds.force_ssl"
+    value        = "1"
+    apply_method = "pending-reboot"
   }
   parameter {
     name         = "max_connections"
@@ -91,7 +92,7 @@ resource "aws_db_instance" "main" {
   parameter_group_name            = aws_db_parameter_group.main.name
   publicly_accessible             = false
   multi_az                        = var.rds_multi_az
-  backup_retention_period         = 7
+  backup_retention_period         = var.backup_retention_days
   backup_window                   = "06:00-07:00"
   maintenance_window              = "sun:07:00-sun:08:00"
   auto_minor_version_upgrade      = true

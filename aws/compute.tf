@@ -41,9 +41,9 @@ resource "aws_launch_template" "ecs" {
 }
 resource "aws_autoscaling_group" "ecs" {
   name                      = "${var.name}-ecs"
-  min_size                  = 1
+  min_size                  = 0
   max_size                  = var.max_tasks + 1
-  desired_capacity          = 1
+  desired_capacity          = 0
   vpc_zone_identifier       = aws_subnet.public[*].id
   protect_from_scale_in     = true
   health_check_type         = "EC2"

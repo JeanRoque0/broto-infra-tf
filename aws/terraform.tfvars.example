@@ -18,3 +18,5 @@ cloudfront_public_key_pem = <<-PEM
 REPLACE_WITH_YOUR_RSA_2048_PUBLIC_KEY
 -----END PUBLIC KEY-----
 PEM
+
+backup_retention_days = 1 # current Free account rejects 7; increase when permitted

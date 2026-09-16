@@ -50,7 +50,7 @@ CloudFront usa seu domínio padrão `*.cloudfront.net` (dispensa outro domínio/
    openssl rsa -in cloudfront-private.pem -pubout -out cloudfront-public.pem
    ```
    Copie apenas o conteúdo de `cloudfront-public.pem` para `cloudfront_public_key_pem`. A chave privada irá para Secrets Manager. Não utilize `tls_private_key` no Terraform: gravaria a chave no estado.
-5. Execute `terraform -chdir=aws init -backend-config=backend.hcl`, `terraform -chdir=aws plan` e revise os custos antes do `apply`. Mantenha `deploy_enabled=false` no primeiro apply: o serviço nasce com zero tasks, mas EC2, RDS e ALB **já cobram**. O ECR inicialmente estará vazio. Se a conta já tiver OIDC do GitHub, informe `github_oidc_provider_arn` para reutilizá-lo.
+5. Execute `terraform -chdir=aws init -backend-config=backend.hcl`, `terraform -chdir=aws plan` e revise os custos antes do `apply`. Mantenha `deploy_enabled=false` no primeiro apply: o serviço nasce com zero tasks, mas RDS e ALB **já cobram** (EC2 começa a cobrar quando a primeira task solicita capacidade). O ECR inicialmente estará vazio. Se a conta já tiver OIDC do GitHub, informe `github_oidc_provider_arn` para reutilizá-lo.
 6. Preencha o secret cujo ARN está em `application_secret_arn` com um objeto JSON contendo estas chaves:
    - `SIGNING_KEY`: aleatória, pelo menos 32 caracteres.
    - `ANTHROPIC_API_KEY`, `SMTP_USER`, `SMTP_PASSWORD`.
@@ -59,11 +59,11 @@ CloudFront usa seu domínio padrão `*.cloudfront.net` (dispensa outro domínio/
    Use console ou arquivo local protegido e `aws secretsmanager put-secret-value --secret-id ARN --secret-string file://application.secrets.json`; nunca coloque o JSON na linha de comando, Git ou tfvars. O pipeline cria uma senha aleatória separada para `database-app`; a senha administrativa do RDS é gerenciada pela AWS. Secrets são injetados ao iniciar a task; rotação exige novas tasks.
 7. No GitHub, autentique `gh auth login` para publicar os commits locais. Respeite a política de privacidade do backend. Crie o environment **production** no repositório da API e restrinja deploy à branch **main**. Copie os valores de `terraform -chdir=aws output -json github_actions_variables` para variables desse environment. Configure **DEPLOY_ENABLED=true como repository variable** só depois de concluir os passos anteriores. O job de deploy fica desativado até lá; o commit inicial não provisiona nem publica imagens por conta própria.
 8. Execute o workflow Build and deploy. Ele roda testes, publica/reutiliza imagem imutável `git-SHA`, usa digest, cria a senha do usuário da aplicação, executa migrations com credencial administrativa e atualiza ECS. Faz verificação explícita de rollback. Não usa access keys permanentes no GitHub.
-9. Após o primeiro deploy saudável, mude `deploy_enabled=true` no Terraform e aplique para ativar autoscaling. O Terraform ignora revisões de task/desired count gerenciadas pelo pipeline/ECS. ASG permite até `max_tasks+1` hosts para acomodar migration/rolling deploy. Esses hosts extras geram custo temporário; 1 EC2 é a estimativa de repouso.
+9. Após o primeiro deploy saudável, mude `deploy_enabled=true` no Terraform e aplique para ativar autoscaling. O Terraform ignora revisões de task/desired count gerenciadas pelo pipeline/ECS. ASG começa com min/desired 0 para que instâncias só nasçam após associar o capacity provider; o primeiro run-task inicia capacidade automaticamente (ECS pode iniciar dois hosts ao sair de zero). ASG permite até `max_tasks+1` hosts para acomodar migration/rolling deploy. Esses hosts extras geram custo temporário; 1 EC2 é a estimativa de repouso.
 
 ## Operação e limitações
 
-- RDS tem TLS obrigatório, backups de 7 dias, proteção contra exclusão, snapshot final e storage inicial 20 GiB com autoscaling até 50 GiB. O usuário `broto_app` tem DML, não é dono das tabelas; schema só muda na task migration. A conexão verifica hostname/cadeia TLS com bundle RDS incluído na imagem.
+- RDS tem TLS obrigatório, backups de 1 dia (`backup_retention_days`; a conta Free rejeitou 7 dias), proteção contra exclusão, snapshot final e storage inicial 20 GiB com autoscaling até 50 GiB. O usuário `broto_app` tem DML, não é dono das tabelas; schema só muda na task migration. A conexão verifica hostname/cadeia TLS com bundle RDS incluído na imagem.
 - Migrations são imutáveis e devem ser compatíveis com a versão anterior durante rolling deploy. Rollback da aplicação não desfaz migrations. Para retornar a uma versão antiga, use seu digest ECR conhecido e o script de deploy após avaliar compatibilidade do schema.
 - ECR mantém 10 releases e remove untagged após 14 dias. Guarde por mais tempo imagens necessárias à sua política de rollback.
 - Logs API/migration retidos por 7 dias; alarmes para memória/disco RDS e ausência de hosts saudáveis. Configure `alarm_email` e confirme assinatura SNS. Não habilitamos logs de acesso ALB/CloudFront para evitar gravar query strings com credenciais temporárias; WAF, Container Insights e RDS Proxy não estão incluídos no custo.
@@ -85,3 +85,9 @@ terraform -chdir=bootstrap validate
 ```
 
 Os testes usam `mock_provider`: os `apply` dentro de testes **não chamam AWS nem criam recursos**. Cobrem dimensões, bootstrap, banco privado/criptografado, contêiner, IMDS e variante HTTPS/HA. Não substituem um deploy real, validação das permissões IAM na conta ou teste ponta a ponta da CDN. Veja [custos mensais](CUSTOS.md).
+
+## Smoke test real da CDN
+
+`python3 scripts/test-cdn.py --private-key /caminho/privado/cloudfront-private.pem` usa a AWS configurada para subir um objeto descartável, validar leitura assinada e negar acesso público/expirado/adulterado. Remove a versão do objeto ao terminar; exige permissão de DeleteObjectVersion para a limpeza. Gera algumas requisições AWS cobradas por uso. A chave privada da implantação atual está também no Secrets Manager; não a coloque no repositório.
+
+O plano Free desta conta rejeitou retenção de backup de 7 dias; a implantação usa 1 dia e não altera o plano de cobrança. Aumente `backup_retention_days` quando a conta permitir e conforme a recuperação exigida.

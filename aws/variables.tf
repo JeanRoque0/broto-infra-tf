@@ -132,3 +132,12 @@ variable "alarm_email" {
   default     = ""
   description = "Optional operational alarm recipient; SNS email confirmation is required."
 }
+variable "backup_retention_days" {
+  type        = number
+  default     = 1
+  description = "Free-plan-compatible initial retention; use 7+ after account plan permits. Never disable automated backups."
+  validation {
+    condition     = var.backup_retention_days >= 1 && var.backup_retention_days <= 35
+    error_message = "Backup retention must be 1..35 days."
+  }
+}
