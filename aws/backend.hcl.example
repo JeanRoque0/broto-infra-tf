@@ -1,0 +1,5 @@
+bucket       = "SUBSTITUA-BUCKET-STATE"
+key          = "broto/production.tfstate"
+region       = "sa-east-1"
+encrypt      = true
+use_lockfile = true

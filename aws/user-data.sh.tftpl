@@ -1,0 +1,32 @@
+#!/bin/bash
+set -euo pipefail
+cat >> /etc/ecs/ecs.config <<'CONFIG'
+ECS_CLUSTER=${cluster}
+ECS_RESERVED_MEMORY=256
+ECS_ENABLE_TASK_IAM_ROLE=true
+ECS_ENABLE_AWSLOGS_EXECUTIONROLE_OVERRIDE=true
+ECS_DISABLE_PRIVILEGED=true
+ECS_IMAGE_CLEANUP_INTERVAL=10m
+ECS_IMAGE_MINIMUM_CLEANUP_AGE=30m
+ECS_NUM_IMAGES_DELETE_PER_CYCLE=5
+CONFIG
+# Block instance-profile access from bridge containers. Task credentials use
+# 169.254.170.2, not IMDS. Reapply after each Docker restart/host reboot.
+cat > /etc/systemd/system/broto-imds-guard.service <<'UNIT'
+[Unit]
+Description=Block container access to EC2 instance credentials
+After=docker.service
+Requires=docker.service
+Before=ecs.service
+PartOf=docker.service
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/iptables -I DOCKER-USER 1 -d 169.254.169.254/32 -j DROP
+RemainAfterExit=yes
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable broto-imds-guard.service
+systemctl start --no-block broto-imds-guard.service
+systemctl enable --now --no-block ecs.service

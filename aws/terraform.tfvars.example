@@ -1,0 +1,21 @@
+aws_region        = "sa-east-1"
+github_repository = "JeanRoque0/broto-api-golang"
+api_domain        = "api.seu-dominio.com"
+route53_zone_id   = "Z_SUBSTITUA_PELA_ZONA_PUBLICA"
+site_url          = "https://seu-dominio.com"
+cors_origins      = "https://seu-dominio.com"
+smtp_from         = "Broto <remetente-verificado@seu-dominio.com>"
+# No actual password/API key belongs in this file.
+deploy_enabled  = false # first apply; true after first successful pipeline
+private_compute = false # true adds private EC2 + one NAT Gateway
+min_tasks       = 1     # 2 for availability during an instance failure
+max_tasks       = 4     # respects the db.t4g.micro connection budget
+rds_multi_az    = false # true for automated DB failover (additional cost)
+# github_oidc_provider_arn = "arn:aws:iam::<account>:oidc-provider/token.actions.githubusercontent.com"
+
+# Public key only; generate outside Terraform.
+cloudfront_public_key_pem = <<-PEM
+-----BEGIN PUBLIC KEY-----
+REPLACE_WITH_YOUR_RSA_2048_PUBLIC_KEY
+-----END PUBLIC KEY-----
+PEM
