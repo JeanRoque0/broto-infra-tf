@@ -37,7 +37,7 @@ Sem domínio, criar a infraestrutura já gera essas cobranças, mesmo com login 
 - EC2 extras durante migration, rolling deploy, recuperação e autoscaling: cada host custa aproximadamente **US$0,04485/h** somando EC2, EBS30GB proporcional e IPv4 no modo público. Capacidade inicial do ECS também pode subir temporariamente acima de um host.
 - Saída de dados da **API/ALB**, tráfego entre AZs, versões anteriores de fotos, downloads não cacheados, requests S3, snapshots/backups excedentes, logs PostgreSQL e crescimento ECR/banco. Storage RDS pode crescer até 50 GB: **US$10,95/mês** só de disco nesse limite, em vez de US$4,38.
 - Créditos CPU excedentes do RDS burstable, se a carga superar a capacidade baseline; EC2 usa Standard e pode ser limitada por falta de créditos. Não confundir vCPU alocada com desempenho sustentado.
-- Registro anual do domínio, cobrança da Anthropic, plano Brevo, GitHub Actions, impostos e conversão para reais. IA pode superar o custo de infraestrutura; depende de tokens/modelo/usuários.
+- Registro anual do domínio, cobrança da DeepSeek, plano Brevo, GitHub Actions, impostos e conversão para reais. IA pode superar o custo de infraestrutura; depende de tokens/modelo/usuários.
 - Multi-AZ, segunda task permanente, WAF, RDS Proxy e NAT redundante não fazem parte da estimativa. O padrão com uma instância e um banco **não é alta disponibilidade**.
 
 ## Reproduzir e fontes

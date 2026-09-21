@@ -20,3 +20,6 @@ REPLACE_WITH_YOUR_RSA_2048_PUBLIC_KEY
 PEM
 
 backup_retention_days = 1 # current Free account rejects 7; increase when permitted
+
+# gh api repos/OWNER/REPO/actions/oidc/customization/sub
+github_oidc_subject_prefix = "repo:JeanRoque0@325452498/broto-api-golang@1371971096"

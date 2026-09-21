@@ -98,7 +98,7 @@ locals {
     STORAGE_BUCKET      = aws_s3_bucket.photos.id, STORAGE_QUOTA_BYTES = "5368709120",
     TRUSTED_PROXY_CIDRS = join(",", aws_subnet.public[*].cidr_block),
     DEV_AUTO_CONFIRM    = "false", SMTP_HOST = var.smtp_host, SMTP_PORT = "587", SMTP_FROM = var.smtp_from, SMTP_MIN_INTERVAL_SECONDS = "60",
-    ANTHROPIC_MODEL     = var.anthropic_model, CHAT_MODEL = var.chat_model, ANTHROPIC_EFFORT = var.anthropic_effort, CHAT_MAX_TOKENS = "2048",
+    VISION_MODEL        = var.vision_model, TEXT_MODEL = var.text_model, CHAT_MODEL = var.chat_model, SEARCH_MODEL = var.search_model, CHAT_MAX_TOKENS = "2048",
     GOOGLE_AUTH_ENABLED = tostring(var.google_enabled), GOOGLE_CLIENT_ID = var.google_client_id,
     GOOGLE_REDIRECT_URL = "${local.public_url}/v1/auth/google/callback", GOOGLE_RETURN_URLS = var.google_return_urls
   })
@@ -125,7 +125,7 @@ resource "aws_ecs_task_definition" "app" {
     healthCheck     = { command = ["CMD", "/broto-api", "healthcheck"], interval = 30, timeout = 3, retries = 3, startPeriod = 30 },
     environment     = [for key, value in local.application_environment : { name = key, value = value }],
     secrets = concat([{ name = "DB_PASSWORD", valueFrom = "${aws_secretsmanager_secret.app_database.arn}:password::" }],
-    [for key in ["SIGNING_KEY", "ANTHROPIC_API_KEY", "SMTP_USER", "SMTP_PASSWORD", "GOOGLE_CLIENT_SECRET", "CLOUDFRONT_PRIVATE_KEY"] : { name = key, valueFrom = "${aws_secretsmanager_secret.app.arn}:${key}::" }]),
+    [for key in ["SIGNING_KEY", "DEEPSEEK_API_KEY", "SMTP_USER", "SMTP_PASSWORD", "GOOGLE_CLIENT_SECRET", "CLOUDFRONT_PRIVATE_KEY"] : { name = key, valueFrom = "${aws_secretsmanager_secret.app.arn}:${key}::" }]),
     logConfiguration = local.log_configuration
   }])
 }

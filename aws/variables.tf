@@ -110,17 +110,21 @@ variable "google_return_urls" {
   type    = string
   default = "broto://auth-callback"
 }
-variable "anthropic_model" {
+variable "vision_model" {
   type    = string
-  default = "claude-opus-5"
+  default = "deepseek-flash"
+}
+variable "text_model" {
+  type    = string
+  default = "deepseek-flash"
 }
 variable "chat_model" {
   type    = string
-  default = "claude-opus-5"
+  default = "deepseek-flash"
 }
-variable "anthropic_effort" {
+variable "search_model" {
   type    = string
-  default = "medium"
+  default = "deepseek-flash"
 }
 variable "initial_image_tag" {
   type        = string
@@ -139,5 +143,15 @@ variable "backup_retention_days" {
   validation {
     condition     = var.backup_retention_days >= 1 && var.backup_retention_days <= 35
     error_message = "Backup retention must be 1..35 days."
+  }
+}
+
+variable "github_oidc_subject_prefix" {
+  type        = string
+  default     = ""
+  description = "Immutable GitHub OIDC sub_claim_prefix from the repository API. Empty supports legacy repo:OWNER/NAME subjects."
+  validation {
+    condition     = var.github_oidc_subject_prefix == "" || can(regex("^repo:[A-Za-z0-9_.-]+@[0-9]+/[A-Za-z0-9_.-]+@[0-9]+$", var.github_oidc_subject_prefix))
+    error_message = "Use the exact immutable repo:OWNER@ID/NAME@ID prefix, without wildcards."
   }
 }

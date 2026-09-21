@@ -58,15 +58,21 @@ run "cost_oriented_bootstrap" {
 run "https_with_scaling" {
   command = apply
   variables {
-    api_domain             = "api.example.com"
-    origin_certificate_arn = "arn:aws:acm:sa-east-1:123456789012:certificate/test"
-    max_tasks              = 2
-    deploy_enabled         = true
-    min_tasks              = 2
-    rds_multi_az           = true
+    api_domain                 = "api.example.com"
+    github_oidc_subject_prefix = "repo:example@123/api@456"
+    origin_certificate_arn     = "arn:aws:acm:sa-east-1:123456789012:certificate/test"
+    max_tasks                  = 2
+    deploy_enabled             = true
+    min_tasks                  = 2
+    rds_multi_az               = true
   }
   assert {
     condition     = length(aws_lb_listener.https) == 1 && aws_launch_template.ecs.network_interfaces[0].associate_public_ip_address && aws_appautoscaling_target.api[0].min_capacity == 2 && aws_db_instance.main.multi_az
     error_message = "HTTPS/HA variant did not enable the requested topology."
   }
+  assert {
+    condition     = jsondecode(aws_iam_role.deploy.assume_role_policy).Statement[0].Condition.StringEquals["token.actions.githubusercontent.com:sub"] == "repo:example@123/api@456:environment:production"
+    error_message = "OIDC trust must preserve immutable repository IDs and the production environment."
+  }
+
 }
