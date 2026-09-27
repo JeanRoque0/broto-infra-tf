@@ -32,10 +32,10 @@ run "cost_oriented_bootstrap" {
   command = apply
   variables {
     deploy_enabled = false
-    jobs_enabled = false
+    jobs_enabled   = false
   }
   assert {
-    condition = [for e in jsondecode(aws_ecs_task_definition.app.container_definitions)[0].environment : e.value if e.name == "JOBS_ENABLED"][0] == "false"
+    condition     = [for e in jsondecode(aws_ecs_task_definition.app.container_definitions)[0].environment : e.value if e.name == "JOBS_ENABLED"][0] == "false"
     error_message = "Snapshot staging must support paused cleanup and reminders."
   }
   assert {
