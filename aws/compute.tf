@@ -92,6 +92,7 @@ locals {
     GOMAXPROCS = "2", GOMEMLIMIT = "600MiB"
   }
   application_environment = merge(local.common_environment, {
+    JOBS_ENABLED        = tostring(var.jobs_enabled),
     DB_USER             = "broto_app", DB_MAX_CONNS = tostring(local.db_pool), AUTO_MIGRATE = "false", MAX_CONCURRENT_REQUESTS = "16",
     PUBLIC_URL          = local.public_url, SITE_URL = var.site_url, CORS_ORIGINS = var.cors_origins,
     CLOUDFRONT_URL      = "https://${aws_cloudfront_distribution.photos.domain_name}", CLOUDFRONT_KEY_ID = aws_cloudfront_public_key.photos.id,

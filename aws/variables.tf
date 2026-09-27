@@ -155,3 +155,9 @@ variable "github_oidc_subject_prefix" {
     error_message = "Use the exact immutable repo:OWNER@ID/NAME@ID prefix, without wildcards."
   }
 }
+
+variable "jobs_enabled" {
+  type        = bool
+  default     = true
+  description = "Enable scheduled cleanup and reminders. Set false while validating an imported snapshot before frontend cutover."
+}

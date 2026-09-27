@@ -30,6 +30,14 @@ variables {
 }
 run "cost_oriented_bootstrap" {
   command = apply
+  variables {
+    deploy_enabled = false
+    jobs_enabled = false
+  }
+  assert {
+    condition = [for e in jsondecode(aws_ecs_task_definition.app.container_definitions)[0].environment : e.value if e.name == "JOBS_ENABLED"][0] == "false"
+    error_message = "Snapshot staging must support paused cleanup and reminders."
+  }
   assert {
     condition     = aws_ecs_task_definition.app.cpu == "2048" && aws_ecs_task_definition.app.memory == "780" && aws_launch_template.ecs.instance_type == "t3.small"
     error_message = "Requested compute sizing changed."
